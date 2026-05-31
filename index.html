@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrendVault — Find What's Selling Right Now</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --gold:#c9a84c; --gold-dim:#8a6e2f; --bg:#060606; --bg2:#0d0d0d;
+  --line:#1c1c1c; --text:#e8e4dc; --muted:#555; --green:#3d9970;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;overflow-x:hidden;}
+
+/* ── PAGES ── */
+.page{display:none;}
+.page.active{display:block;}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:20px 48px;border-bottom:1px solid transparent;transition:all .3s;}
+nav.scrolled{border-bottom-color:var(--line);background:rgba(6,6,6,.92);backdrop-filter:blur(12px);}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.15em;color:var(--gold);cursor:pointer;}
+.logo span{color:var(--text);}
+nav ul{list-style:none;display:flex;gap:32px;}
+nav ul a{color:var(--muted);text-decoration:none;font-size:11px;letter-spacing:.12em;transition:color .2s;}
+nav ul a:hover{color:var(--text);}
+.nav-cta{background:var(--gold);color:#000;border:none;padding:9px 20px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.1em;cursor:pointer;transition:opacity .2s;}
+.nav-cta:hover{opacity:.85;}
+
+/* ── HERO ── */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:120px 48px 80px;position:relative;overflow:hidden;}
+.hero-grid{position:absolute;inset:0;opacity:.04;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:60px 60px;}
+.hero-glow{position:absolute;top:-200px;right:-200px;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(201,168,76,.07) 0%,transparent 70%);pointer-events:none;}
+.hero-tag{font-size:10px;letter-spacing:.25em;color:var(--gold);margin-bottom:28px;opacity:0;animation:fadeUp .7s .1s forwards;}
+.hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(52px,9vw,120px);font-weight:300;line-height:.92;letter-spacing:-.02em;max-width:900px;opacity:0;animation:fadeUp .8s .2s forwards;}
+.hero h1 em{font-style:italic;color:var(--gold);}
+.hero-sub{margin-top:36px;max-width:480px;font-size:13px;line-height:1.8;color:var(--muted);opacity:0;animation:fadeUp .8s .35s forwards;}
+.hero-actions{margin-top:48px;display:flex;gap:16px;align-items:center;opacity:0;animation:fadeUp .8s .5s forwards;}
+.btn-primary{background:var(--gold);color:#000;border:none;padding:14px 32px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;letter-spacing:.12em;cursor:pointer;transition:all .2s;}
+.btn-primary:hover{opacity:.88;transform:translateY(-1px);}
+.btn-ghost{background:none;color:var(--muted);border:1px solid var(--line);padding:14px 32px;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:.12em;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-block;}
+.btn-ghost:hover{border-color:var(--muted);color:var(--text);}
+.hero-stats{margin-top:80px;display:flex;gap:48px;opacity:0;animation:fadeUp .8s .65s forwards;}
+.stat-item{border-left:1px solid var(--line);padding-left:20px;}
+.stat-num{font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--text);letter-spacing:.05em;}
+.stat-label{font-size:10px;color:var(--muted);letter-spacing:.15em;margin-top:2px;}
+
+/* ── TICKER ── */
+.ticker{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:14px 0;overflow:hidden;background:var(--bg2);}
+.ticker-track{display:flex;animation:ticker 30s linear infinite;white-space:nowrap;}
+.ticker-item{font-size:11px;color:var(--muted);letter-spacing:.1em;padding:0 32px;border-right:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+.ticker-item .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);flex-shrink:0;}
+.ticker-item .price{color:var(--gold);}
+
+/* ── SECTIONS ── */
+.section{padding:100px 48px;}
+.section-label{font-size:10px;letter-spacing:.25em;color:var(--gold);margin-bottom:16px;}
+.section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(36px,5vw,64px);font-weight:300;line-height:1.05;}
+.section-title em{font-style:italic;color:var(--gold);}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1px;margin-top:64px;border:1px solid var(--line);background:var(--line);}
+.feature-card{background:var(--bg);padding:40px 36px;transition:background .2s;}
+.feature-card:hover{background:var(--bg2);}
+.feature-icon{font-size:24px;margin-bottom:20px;color:var(--gold);}
+.feature-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;margin-bottom:12px;}
+.feature-desc{font-size:12px;color:var(--muted);line-height:1.8;}
+.how-section{padding:100px 48px;background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:48px;margin-top:64px;}
+.step-num{font-family:'Bebas Neue',sans-serif;font-size:72px;color:var(--line);line-height:1;margin-bottom:16px;transition:color .3s;}
+.step:hover .step-num{color:var(--gold-dim);}
+.step-title{font-size:13px;letter-spacing:.1em;margin-bottom:10px;color:var(--text);}
+.step-desc{font-size:11px;color:var(--muted);line-height:1.8;}
+.pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:64px;max-width:800px;}
+.price-card{border:1px solid var(--line);padding:40px 36px;position:relative;transition:border-color .2s;}
+.price-card:hover{border-color:var(--muted);}
+.price-card.featured{border-color:var(--gold);background:linear-gradient(135deg,rgba(201,168,76,.04) 0%,transparent 60%);}
+.price-badge{position:absolute;top:-1px;right:24px;background:var(--gold);color:#000;font-size:9px;letter-spacing:.15em;font-weight:500;padding:5px 12px;}
+.price-tier{font-size:10px;letter-spacing:.2em;color:var(--muted);margin-bottom:16px;}
+.price-amount{font-family:'Cormorant Garamond',serif;font-size:56px;font-weight:300;line-height:1;margin-bottom:4px;}
+.price-amount span{font-size:20px;vertical-align:super;}
+.price-period{font-size:11px;color:var(--muted);margin-bottom:32px;}
+.price-features{list-style:none;margin-bottom:36px;}
+.price-features li{font-size:12px;color:var(--muted);padding:9px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+.price-features li .check{color:var(--green);font-size:14px;}
+.price-features li .x{color:#444;}
+.price-features li.active{color:var(--text);}
+.capture-section{padding:100px 48px;background:var(--bg2);border-top:1px solid var(--line);text-align:center;}
+.capture-inner{max-width:560px;margin:0 auto;}
+.email-form{display:flex;gap:0;margin-top:40px;max-width:480px;margin-left:auto;margin-right:auto;}
+.email-input{flex:1;background:var(--bg);border:1px solid var(--line);border-right:none;padding:14px 20px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;transition:border-color .2s;}
+.email-input:focus{border-color:var(--gold);}
+.email-input::placeholder{color:var(--muted);}
+.email-submit{background:var(--gold);color:#000;border:none;padding:14px 24px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;letter-spacing:.1em;cursor:pointer;white-space:nowrap;}
+.form-note{font-size:10px;color:var(--muted);margin-top:12px;letter-spacing:.05em;}
+.success-msg{display:none;color:var(--green);font-size:12px;margin-top:16px;letter-spacing:.1em;}
+footer{border-top:1px solid var(--line);padding:32px 48px;display:flex;justify-content:space-between;align-items:center;}
+.footer-links{display:flex;gap:24px;}
+.footer-links a{font-size:10px;color:var(--muted);text-decoration:none;letter-spacing:.1em;}
+.footer-copy{font-size:10px;color:var(--muted);letter-spacing:.08em;}
+
+/* ── AUTH ── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);}
+.auth-box{width:100%;max-width:420px;border:1px solid var(--line);padding:48px 40px;background:var(--bg2);}
+.auth-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--gold);letter-spacing:.15em;margin-bottom:8px;}
+.auth-logo span{color:var(--text);}
+.auth-sub{font-size:11px;color:var(--muted);letter-spacing:.1em;margin-bottom:36px;}
+.auth-tabs{display:flex;margin-bottom:32px;border-bottom:1px solid var(--line);}
+.auth-tab{flex:1;background:none;border:none;padding:12px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.12em;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;}
+.auth-tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:10px;letter-spacing:.15em;color:var(--muted);margin-bottom:8px;}
+.field input{width:100%;background:var(--bg);border:1px solid var(--line);padding:12px 16px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--gold);}
+.auth-btn{width:100%;background:var(--gold);color:#000;border:none;padding:14px;margin-top:8px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;letter-spacing:.12em;cursor:pointer;}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed;}
+.auth-msg{font-size:11px;margin-top:16px;text-align:center;min-height:20px;letter-spacing:.05em;}
+.auth-msg.error{color:#c55;}
+.auth-msg.success{color:var(--green);}
+.back-link{display:block;text-align:center;margin-top:20px;font-size:10px;color:var(--muted);letter-spacing:.1em;cursor:pointer;}
+.back-link:hover{color:var(--text);}
+
+/* ── DASHBOARD ── */
+.topbar{border-bottom:1px solid var(--line);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;background:var(--bg2);position:sticky;top:0;z-index:10;}
+.topbar-logo{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--gold);letter-spacing:.15em;cursor:pointer;}
+.topbar-logo span{color:var(--text);}
+.topbar-right{display:flex;align-items:center;gap:16px;}
+.user-email{font-size:10px;color:var(--muted);letter-spacing:.08em;}
+.plan-badge{font-size:9px;letter-spacing:.15em;padding:4px 10px;border:1px solid var(--gold);color:var(--gold);}
+.plan-badge.free{border-color:var(--muted);color:var(--muted);}
+.signout-btn{background:none;border:1px solid var(--line);color:var(--muted);padding:6px 14px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;cursor:pointer;transition:all .2s;}
+.signout-btn:hover{border-color:var(--muted);color:var(--text);}
+.dash-inner{max-width:1200px;margin:0 auto;padding:32px;}
+.upgrade-banner{background:linear-gradient(135deg,rgba(201,168,76,.08) 0%,transparent 60%);border:1px solid var(--gold);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;gap:16px;}
+.upgrade-banner p{font-size:11px;color:var(--text);letter-spacing:.05em;}
+.upgrade-banner span{color:var(--gold);}
+.upgrade-btn{background:var(--gold);color:#000;border:none;padding:8px 20px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.12em;cursor:pointer;white-space:nowrap;}
+.cats{display:flex;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:32px;}
+.cat-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:14px 18px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;cursor:pointer;white-space:nowrap;transition:all .2s;margin-bottom:-1px;}
+.cat-btn.active{color:var(--gold);border-bottom-color:var(--gold);}
+.fetch-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:12px;flex-wrap:wrap;}
+.fetch-info{font-size:10px;color:var(--muted);letter-spacing:.08em;}
+.fetch-btn{background:var(--gold);color:#000;border:none;padding:10px 24px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.1em;cursor:pointer;display:flex;align-items:center;gap:8px;}
+.fetch-btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed;}
+.sort-row{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;}
+.sort-btn{background:none;border:1px solid var(--line);color:var(--muted);padding:6px 14px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;cursor:pointer;transition:all .2s;}
+.sort-btn.active{background:var(--bg2);border-color:#3a3a3a;color:var(--text);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.card{background:var(--bg2);border:1px solid var(--line);padding:24px;position:relative;overflow:hidden;transition:border-color .2s;animation:fadeUp .4s ease forwards;}
+.card:hover{border-color:#3a3a3a;}
+.card-rank{position:absolute;top:0;right:0;font-size:9px;font-family:'DM Mono',monospace;padding:4px 10px;letter-spacing:.1em;font-weight:500;color:#000;}
+.card-meta{font-size:9px;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px;}
+.card-name{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:400;color:var(--text);margin-bottom:8px;line-height:1.4;}
+.card-desc{font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:16px;}
+.card-bottom{display:flex;justify-content:space-between;align-items:flex-end;}
+.card-reviews{font-size:10px;color:var(--muted);margin-top:4px;}
+.card-price{font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--gold);text-align:right;}
+.card-orig{font-size:11px;color:var(--muted);text-decoration:line-through;}
+.card-badge{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:10px;color:#4a9;letter-spacing:.05em;}
+.skeleton{background:var(--bg2);border:1px solid var(--line);padding:24px;}
+.skel-line{height:12px;border-radius:2px;margin-bottom:14px;background:linear-gradient(90deg,#1a1a1a 25%,#222 50%,#1a1a1a 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;}
+.empty{text-align:center;padding:80px 0;}
+.empty-icon{font-size:40px;opacity:.2;margin-bottom:20px;}
+.empty-title{font-family:'Cormorant Garamond',serif;font-size:24px;color:#444;margin-bottom:12px;}
+.empty-sub{font-size:11px;color:#333;letter-spacing:.1em;margin-bottom:32px;}
+.limit-msg{text-align:center;padding:40px;border:1px solid #3a1a1a;background:#1a0a0a;margin-top:24px;}
+.limit-msg p{font-size:12px;color:#c55;margin-bottom:16px;}
+.csv-btn{background:none;border:1px solid var(--line);color:var(--muted);padding:8px 18px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;cursor:pointer;transition:all .2s;}
+.csv-btn:hover{border-color:var(--gold);color:var(--gold);}
+.csv-btn.locked{opacity:.4;cursor:not-allowed;}
+.error-msg{font-size:11px;color:#c55;padding:16px;border:1px solid #3a1a1a;background:#1a0a0a;margin-bottom:24px;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;animation:spin 1s linear infinite;}
+
+@media(max-width:768px){
+  nav{padding:16px 24px;}
+  nav ul{display:none;}
+  .hero{padding:100px 24px 60px;}
+  .hero-stats{gap:24px;flex-wrap:wrap;}
+  .section{padding:64px 24px;}
+  .how-section{padding:64px 24px;}
+  .capture-section{padding:64px 24px;}
+  footer{padding:24px;flex-direction:column;gap:16px;text-align:center;}
+  .email-form{flex-direction:column;}
+  .email-input{border-right:1px solid var(--line);border-bottom:none;}
+  .topbar{padding:12px 16px;}
+  .dash-inner{padding:16px;}
+  .user-email{display:none;}
+  .upgrade-banner{flex-direction:column;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LANDING PAGE ══ -->
+<div class="page active" id="page-landing">
+<nav id="nav">
+  <div class="logo" onclick="showPage('page-landing')">Trend<span>Vault</span></div>
+  <ul>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+  </ul>
+  <button class="nav-cta" onclick="showPage('page-auth')">GET EARLY ACCESS</button>
+</nav>
+
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-tag">◈ AI-POWERED PRODUCT INTELLIGENCE</div>
+  <h1>Know What's<br><em>Selling</em><br>Right Now.</h1>
+  <p class="hero-sub">TrendVault scans the web daily and surfaces the top-selling products over $100 — so you can stock smarter, sell faster, and stay ahead of the market.</p>
+  <div class="hero-actions">
+    <button class="btn-primary" onclick="showPage('page-auth')">START FOR FREE</button>
+    <a href="#how" class="btn-ghost">SEE HOW IT WORKS</a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat-item"><div class="stat-num">9+</div><div class="stat-label">CATEGORIES TRACKED</div></div>
+    <div class="stat-item"><div class="stat-num">$100</div><div class="stat-label">MINIMUM PRICE FILTER</div></div>
+    <div class="stat-item"><div class="stat-num">24H</div><div class="stat-label">REFRESH CYCLE</div></div>
+    <div class="stat-item"><div class="stat-num">FREE</div><div class="stat-label">TO GET STARTED</div></div>
+  </div>
+</section>
+
+<div class="ticker"><div class="ticker-track" id="ticker"></div></div>
+
+<section class="section" id="features">
+  <div class="section-label">◈ WHAT YOU GET</div>
+  <div class="section-title">Everything you need to<br><em>spot trends early.</em></div>
+  <div class="features-grid">
+    <div class="feature-card"><div class="feature-icon">⚡</div><div class="feature-title">Daily AI Scans</div><div class="feature-desc">Every morning, our AI scans the web for trending products over $100 across all major retailers and surfaces what's actually selling.</div></div>
+    <div class="feature-card"><div class="feature-icon">◎</div><div class="feature-title">Category Filtering</div><div class="feature-desc">Drill down into Electronics, Fashion, Home, Beauty, Sports, Gaming and more. Find the trends that matter to your niche.</div></div>
+    <div class="feature-card"><div class="feature-icon">↓</div><div class="feature-title">CSV Export</div><div class="feature-desc">Download your product lists in one click. Drop them straight into your inventory tool, spreadsheet, or sourcing workflow.</div></div>
+    <div class="feature-card"><div class="feature-icon">◆</div><div class="feature-title">Trend History</div><div class="feature-desc">See how products perform over time. Spot what's rising, what's peaking, and what's fading before the rest of the market catches on.</div></div>
+    <div class="feature-card"><div class="feature-icon">✦</div><div class="feature-title">Email Alerts</div><div class="feature-desc">Get notified when new top sellers appear in your chosen categories. Never miss a trend again, even when you're not logged in.</div></div>
+    <div class="feature-card"><div class="feature-icon">▣</div><div class="feature-title">Smart Ranking</div><div class="feature-desc">Products are ranked by real sell-through signals — reviews, ratings, search volume — not just price or sponsorship.</div></div>
+  </div>
+</section>
+
+<section class="how-section" id="how">
+  <div class="section-label">◈ HOW IT WORKS</div>
+  <div class="section-title">Simple. Powerful.<br><em>Built for sellers.</em></div>
+  <div class="steps">
+    <div class="step"><div class="step-num">01</div><div class="step-title">SIGN UP FREE</div><div class="step-desc">Create your account in seconds. No credit card required to get started with the free tier.</div></div>
+    <div class="step"><div class="step-num">02</div><div class="step-title">CHOOSE YOUR CATEGORIES</div><div class="step-desc">Select the product categories that matter to your business. Electronics, fashion, home goods, and more.</div></div>
+    <div class="step"><div class="step-num">03</div><div class="step-title">GET DAILY RESULTS</div><div class="step-desc">Every morning your dashboard updates with the latest top sellers. Refresh anytime for on-demand results.</div></div>
+    <div class="step"><div class="step-num">04</div><div class="step-title">ACT ON THE DATA</div><div class="step-desc">Export, set alerts, track history. Use the intelligence to stock smarter and sell faster than your competition.</div></div>
+  </div>
+</section>
+
+<section class="section" id="pricing">
+  <div class="section-label">◈ PRICING</div>
+  <div class="section-title">Start free.<br><em>Scale when ready.</em></div>
+  <div class="pricing-grid">
+    <div class="price-card">
+      <div class="price-tier">FREE TIER</div>
+      <div class="price-amount"><span>$</span>0</div>
+      <div class="price-period">forever free</div>
+      <ul class="price-features">
+        <li class="active"><span class="check">✓</span> 3 searches per day</li>
+        <li class="active"><span class="check">✓</span> All categories</li>
+        <li class="active"><span class="check">✓</span> Basic sorting</li>
+        <li><span class="x">✗</span> CSV export</li>
+        <li><span class="x">✗</span> Trend history</li>
+        <li><span class="x">✗</span> Email alerts</li>
+      </ul>
+      <button class="btn-ghost" style="width:100%" onclick="showPage('page-auth')">GET STARTED FREE</button>
+    </div>
+    <div class="price-card featured">
+      <div class="price-badge">MOST POPULAR</div>
+      <div class="price-tier">PRO</div>
+      <div class="price-amount"><span>$</span>9</div>
+      <div class="price-period">per month · cancel anytime</div>
+      <ul class="price-features">
+        <li class="active"><span class="check">✓</span> Unlimited searches</li>
+        <li class="active"><span class="check">✓</span> All categories</li>
+        <li class="active"><span class="check">✓</span> Advanced sorting</li>
+        <li class="active"><span class="check">✓</span> CSV export</li>
+        <li class="active"><span class="check">✓</span> 90-day trend history</li>
+        <li class="active"><span class="check">✓</span> Daily email alerts</li>
+      </ul>
+      <button class="btn-primary" style="width:100%" onclick="showPage('page-auth')">START PRO — $9/MO</button>
+    </div>
+  </div>
+</section>
+
+<section class="capture-section" id="signup">
+  <div class="capture-inner">
+    <div class="section-label" style="text-align:center">◈ EARLY ACCESS</div>
+    <div class="section-title" style="font-size:clamp(32px,5vw,56px);text-align:center">Be first in.<br><em>Join the waitlist.</em></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:20px;line-height:1.8">We're opening up TrendVault to early users. Sign up now to get free Pro access for your first month.</p>
+    <div class="email-form">
+      <input class="email-input" type="email" id="emailInput" placeholder="your@email.com"/>
+      <button class="email-submit" onclick="handleWaitlist()">JOIN WAITLIST</button>
+    </div>
+    <div class="form-note">No spam. No credit card. Just early access.</div>
+    <div class="success-msg" id="successMsg">✓ YOU'RE ON THE LIST — WE'LL BE IN TOUCH SOON.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="logo">Trend<span>Vault</span></div>
+  <div class="footer-links"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Contact</a></div>
+  <div class="footer-copy">© 2026 TRENDVAULT. ALL RIGHTS RESERVED.</div>
+</footer>
+</div>
+
+<!-- ══ AUTH PAGE ══ -->
+<div class="page" id="page-auth">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="auth-logo">Trend<span>Vault</span></div>
+      <div class="auth-sub">AI-POWERED PRODUCT INTELLIGENCE</div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchTab('login')">SIGN IN</button>
+        <button class="auth-tab" onclick="switchTab('signup')">CREATE ACCOUNT</button>
+      </div>
+      <div class="field"><label>EMAIL ADDRESS</label><input type="email" id="authEmail" placeholder="you@email.com"/></div>
+      <div class="field"><label>PASSWORD</label><input type="password" id="authPass" placeholder="••••••••"/></div>
+      <button class="auth-btn" id="authBtn" onclick="handleAuth()">SIGN IN</button>
+      <div class="auth-msg" id="authMsg"></div>
+      <span class="back-link" onclick="showPage('page-landing')">← BACK TO HOME</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD PAGE ══ -->
+<div class="page" id="page-dash">
+  <div class="topbar">
+    <div class="topbar-logo" onclick="showPage('page-landing')">Trend<span>Vault</span></div>
+    <div class="topbar-right">
+      <span class="user-email" id="userEmail"></span>
+      <span class="plan-badge free" id="planBadge">FREE</span>
+      <button class="signout-btn" onclick="signOut()">SIGN OUT</button>
+    </div>
+  </div>
+  <div class="dash-inner">
+    <div class="upgrade-banner" id="upgradeBanner">
+      <p>You're on the <span>Free Plan</span> — 3 searches/day. Upgrade to Pro for unlimited searches, CSV export & email alerts.</p>
+      <button class="upgrade-btn" onclick="upgrade()">UPGRADE — $9/MO</button>
+    </div>
+    <div class="cats" id="cats"></div>
+    <div class="fetch-row">
+      <div class="fetch-info" id="fetchInfo">SELECT A CATEGORY AND FETCH PRODUCTS</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="csv-btn locked" id="csvBtn" onclick="exportCSV()">↓ CSV</button>
+        <button class="fetch-btn" id="fetchBtn" onclick="fetchProducts()">⚡ FETCH NOW</button>
+      </div>
+    </div>
+    <div class="sort-row" id="sortRow" style="display:none">
+      <button class="sort-btn active" onclick="setSort('trending',this)">TRENDING</button>
+      <button class="sort-btn" onclick="setSort('price-high',this)">PRICE ↓</button>
+      <button class="sort-btn" onclick="setSort('price-low',this)">PRICE ↑</button>
+      <button class="sort-btn" onclick="setSort('rated',this)">TOP RATED</button>
+    </div>
+    <div id="errorMsg" class="error-msg" style="display:none"></div>
+    <div class="grid" id="grid">
+      <div class="empty">
+        <div class="empty-icon">◈</div>
+        <div class="empty-title">Ready to find top sellers</div>
+        <div class="empty-sub">CHOOSE A CATEGORY AND HIT FETCH NOW</div>
+      </div>
+    </div>
+    <div id="limitMsg" class="limit-msg" style="display:none">
+      <p>⚡ You've used all 3 free searches today. Upgrade to Pro for unlimited searches.</p>
+      <button class="upgrade-btn" onclick="upgrade()">UPGRADE TO PRO — $9/MO</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://fchlidkrfxabhzzymxbj.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjaGxpZGtyZnhhYmh6enlteGJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMTAwNzYsImV4cCI6MjA5NTY4NjA3Nn0.RUXiDqitW_IFrm7K0QeN5jcyW1IogvXh9nWqs6cdO2k';
+const {createClient}=supabase;
+const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const CATS=[
+  {id:'all',label:'All Categories',icon:'◈'},
+  {id:'electronics',label:'Electronics',icon:'⚡'},
+  {id:'fashion',label:'Fashion',icon:'◆'},
+  {id:'home',label:'Home & Living',icon:'⬡'},
+  {id:'beauty',label:'Beauty',icon:'✦'},
+  {id:'sports',label:'Sports',icon:'◎'},
+  {id:'gaming',label:'Gaming',icon:'▣'},
+];
+
+let currentUser=null,isPro=false,currentTab='login',currentCat='all',currentSort='trending',products=[],searchCount=0;
+const FREE_LIMIT=3;
+
+// ── PAGE ROUTING ──
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// ── LANDING ──
+window.addEventListener('scroll',()=>{
+  document.getElementById('nav')?.classList.toggle('scrolled',window.scrollY>40);
+});
+
+const tickerItems=[
+  {name:'Sony WH-1000XM5',price:'$349',cat:'ELECTRONICS'},
+  {name:'Samsung 65" QLED TV',price:'$1,299',cat:'ELECTRONICS'},
+  {name:'Dyson V15 Detect',price:'$749',cat:'HOME'},
+  {name:'Apple Watch Ultra 2',price:'$799',cat:'WEARABLES'},
+  {name:'Lululemon Define Jacket',price:'$128',cat:'FASHION'},
+  {name:'KitchenAid Stand Mixer',price:'$449',cat:'HOME'},
+  {name:'PlayStation 5 Pro',price:'$699',cat:'GAMING'},
+  {name:'Theragun Pro',price:'$599',cat:'WELLNESS'},
+  {name:'Vitamix A3500',price:'$549',cat:'HOME'},
+];
+const doubled=[...tickerItems,...tickerItems];
+const track=document.getElementById('ticker');
+if(track) track.innerHTML=doubled.map(i=>`<div class="ticker-item"><span class="dot"></span><span>${i.cat}</span><span style="color:#999">${i.name}</span><span class="price">${i.price}</span></div>`).join('');
+
+function handleWaitlist(){
+  const email=document.getElementById('emailInput').value;
+  if(!email||!email.includes('@')){document.getElementById('emailInput').style.borderColor='#c55';return;}
+  const u='50aa0e0e732a31611f09141c',id='79dc4f8053';
+  const url=`https://us13.list-manage.com/subscribe/post-json?u=${u}&id=${id}&c=mcCb&EMAIL=${encodeURIComponent(email)}`;
+  window.mcCb=function(){};
+  const s=document.createElement('script');s.src=url;document.body.appendChild(s);
+  document.querySelector('.email-form').style.display='none';
+  document.getElementById('successMsg').style.display='block';
+}
+
+// Scroll reveal
+const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.style.opacity='1';e.target.style.transform='translateY(0)';}});
+},{threshold:0.1});
+document.querySelectorAll('.feature-card,.step,.price-card').forEach(el=>{
+  el.style.opacity='0';el.style.transform='translateY(20px)';
+  el.style.transition='opacity .6s ease, transform .6s ease';
+  observer.observe(el);
+});
+
+// ── AUTH ──
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&tab==='login')||(i===1&&tab==='signup')));
+  document.getElementById('authBtn').textContent=tab==='login'?'SIGN IN':'CREATE ACCOUNT';
+  document.getElementById('authMsg').textContent='';
+}
+
+async function handleAuth(){
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  const btn=document.getElementById('authBtn');
+  const msg=document.getElementById('authMsg');
+  if(!email||!pass){setAuthMsg('Please enter email and password.','error');return;}
+  if(pass.length<6){setAuthMsg('Password must be at least 6 characters.','error');return;}
+  btn.disabled=true;btn.textContent='PLEASE WAIT...';msg.textContent='';
+  try{
+    let result;
+    if(currentTab==='login'){result=await sb.auth.signInWithPassword({email,password:pass});}
+    else{result=await sb.auth.signUp({email,password:pass});}
+    if(result.error)throw result.error;
+    if(currentTab==='signup'&&!result.data?.session){
+      setAuthMsg('✓ Check your email to confirm your account!','success');
+    }else{
+      currentUser=result.data.user||result.data.session?.user;
+      loadDashboard();
+    }
+  }catch(err){setAuthMsg(err.message||'Something went wrong.','error');}
+  finally{btn.disabled=false;btn.textContent=currentTab==='login'?'SIGN IN':'CREATE ACCOUNT';}
+}
+
+function setAuthMsg(text,type){
+  const msg=document.getElementById('authMsg');
+  msg.textContent=text;msg.className='auth-msg '+type;
+}
+
+async function signOut(){
+  await sb.auth.signOut();
+  currentUser=null;products=[];searchCount=0;
+  showPage('page-landing');
+}
+
+// ── DASHBOARD ──
+function loadDashboard(){
+  showPage('page-dash');
+  document.getElementById('userEmail').textContent=currentUser?.email||'';
+  isPro=false;
+  updatePlanUI();
+  buildCats();
+  loadSearchCount();
+}
+
+function updatePlanUI(){
+  const badge=document.getElementById('planBadge');
+  const banner=document.getElementById('upgradeBanner');
+  const csvBtn=document.getElementById('csvBtn');
+  if(isPro){badge.textContent='PRO';badge.classList.remove('free');banner.style.display='none';csvBtn.classList.remove('locked');}
+  else{badge.textContent='FREE';badge.classList.add('free');banner.style.display='flex';csvBtn.classList.add('locked');}
+}
+
+function buildCats(){
+  document.getElementById('cats').innerHTML=CATS.map(c=>
+    `<button class="cat-btn${c.id===currentCat?' active':''}" onclick="setCat('${c.id}',this)">${c.icon} ${c.label.toUpperCase()}</button>`
+  ).join('');
+}
+
+function setCat(id,el){
+  currentCat=id;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setSort(s,el){
+  currentSort=s;
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderProducts();
+}
+
+function loadSearchCount(){
+  const key=`tv_${new Date().toDateString()}_${currentUser?.id}`;
+  searchCount=parseInt(localStorage.getItem(key)||'0');
+}
+
+function incrementSearchCount(){
+  const key=`tv_${new Date().toDateString()}_${currentUser?.id}`;
+  searchCount++;localStorage.setItem(key,searchCount);
+}
+
+async function fetchProducts(){
+  if(!isPro&&searchCount>=FREE_LIMIT){document.getElementById('limitMsg').style.display='block';return;}
+  const btn=document.getElementById('fetchBtn');
+  const grid=document.getElementById('grid');
+  const info=document.getElementById('fetchInfo');
+  const errMsg=document.getElementById('errorMsg');
+  btn.disabled=true;btn.innerHTML='<span class="spin">◌</span> SEARCHING...';
+  errMsg.style.display='none';document.getElementById('limitMsg').style.display='none';
+  document.getElementById('sortRow').style.display='none';products=[];
+  grid.innerHTML=Array(9).fill(0).map(()=>`<div class="skeleton">${[80,55,100,40].map(w=>`<div class="skel-line" style="width:${w}%"></div>`).join('')}</div>`).join('');
+  const catLabel=CATS.find(c=>c.id===currentCat)?.label||'all categories';
+  const catPhrase=currentCat==='all'?'across all popular categories like electronics, fashion, home, beauty, sports, and gaming':catLabel;
+  const prompt=`List 9 real top-selling products priced at $100 or more in: ${catPhrase}. Respond with ONLY a JSON array. No markdown, no explanation. Start with [ end with ]. Each object: rank(1-9), name, category, price(string), description(1 sentence), rating(4.0-5.0), reviews(string), source(retailer), badge(short label). Example: [{"rank":1,"name":"Sony WH-1000XM5","category":"Electronics","price":"349","description":"Best noise-cancelling headphones.","rating":4.8,"reviews":"28,400","source":"Amazon","badge":"#1 Best Seller"}]`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':'placeholder','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]}),
+    });
+    const data=await res.json();
+    if(!res.ok)throw new Error(data?.error?.message||`HTTP ${res.status}`);
+    const raw=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const match=clean.match(/\[[\s\S]*\]/);
+    if(!match)throw new Error('Could not parse product list.');
+    products=JSON.parse(match[0]);
+    incrementSearchCount();
+    const remaining=FREE_LIMIT-searchCount;
+    info.textContent=isPro?`${products.length} PRODUCTS · UNLIMITED`:`${products.length} PRODUCTS · ${remaining>0?remaining+' SEARCHES LEFT TODAY':'NO SEARCHES LEFT TODAY'}`;
+    document.getElementById('sortRow').style.display='flex';
+    renderProducts();
+    if(!isPro&&searchCount>=FREE_LIMIT)setTimeout(()=>{document.getElementById('limitMsg').style.display='block';},500);
+  }catch(err){
+    errMsg.textContent='✕ '+err.message;errMsg.style.display='block';grid.innerHTML='';info.textContent='FETCH FAILED — TRY AGAIN';
+  }finally{
+    btn.disabled=false;btn.innerHTML='↻ REFRESH';
+  }
+}
+
+function renderProducts(){
+  const sorted=[...products].sort((a,b)=>{
+    if(currentSort==='price-high')return parseFloat(b.price)-parseFloat(a.price);
+    if(currentSort==='price-low')return parseFloat(a.price)-parseFloat(b.price);
+    if(currentSort==='rated')return b.rating-a.rating;
+    return a.rank-b.rank;
+  });
+  const rankColors=['#c9a84c','#8a8a8a','#8b5c2a'];
+  document.getElementById('grid').innerHTML=sorted.map((p,i)=>`
+    <div class="card" style="animation-delay:${i*60}ms">
+      ${p.rank<=3?`<div class="card-rank" style="background:${rankColors[p.rank-1]}">#${p.rank} TRENDING</div>`:''}
+      <div class="card-meta">${p.category} · ${p.source}</div>
+      <div class="card-name">${p.name}</div>
+      <div class="card-desc">${p.description}</div>
+      <div class="card-bottom">
+        <div>
+          <div style="display:flex;gap:2px">${[1,2,3,4,5].map(s=>`<span style="color:${s<=Math.round(p.rating)?'#f5c842':'#333'};font-size:11px">★</span>`).join('')}<span style="color:#888;font-size:11px;margin-left:4px">${p.rating}</span></div>
+          <div class="card-reviews">${p.reviews} reviews</div>
+        </div>
+        <div><div class="card-price">$${p.price}</div>${p.originalPrice?`<div class="card-orig">$${p.originalPrice}</div>`:''}</div>
+      </div>
+      ${p.badge?`<div class="card-badge">✓ ${p.badge}</div>`:''}
+    </div>`).join('');
+}
+
+function exportCSV(){
+  if(!isPro)return;
+  const headers=['Rank','Name','Category','Price','Rating','Reviews','Source','Badge'];
+  const rows=products.map(p=>[p.rank,`"${p.name}"`,p.category,p.price,p.rating,p.reviews,p.source,`"${p.badge||''}"`]);
+  const csv=[headers,...rows].map(r=>r.join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`trendvault-${currentCat}-${new Date().toISOString().slice(0,10)}.csv`;a.click();
+}
+
+function upgrade(){
+  alert('Payment coming soon! Email us at hello@trendvault.com to upgrade manually for now.');
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('page-auth').classList.contains('active'))handleAuth();
+});
+
+// Check session on load
+sb.auth.getSession().then(({data})=>{
+  if(data?.session?.user){currentUser=data.session.user;loadDashboard();}
+});
+</script>
+</body>
+</html>
